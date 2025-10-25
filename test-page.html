@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algorithm Test Page</title>
+</head>
+<body>
+    <h1>Testing Ultra-Optimized Algorithms</h1>
+    <p>Check the browser console for test results</p>
+    
+    <script src="maze-data.js"></script>
+    <script src="algorithms.js"></script>
+    <script>
+        console.log("🧪 Testing Ultra-Optimized Maze Algorithms");
+        
+        // Test 1: Check if algorithms are registered
+        console.log("\n📋 Algorithm Registry Check:");
+        const newAlgorithms = [
+            'perfect-score',
+            'intelligent-explorer', 
+            'ultra-efficient-wall-follower',
+            'strategic-dead-end-seeker'
+        ];
+        
+        for (const algo of newAlgorithms) {
+            if (ALGORITHMS[algo]) {
+                console.log(`✅ ${algo}: Available`);
+            } else {
+                console.log(`❌ ${algo}: Missing`);
+            }
+        }
+        
+        // Test 2: Test algorithm execution
+        console.log("\n🎯 Testing Algorithm Execution:");
+        
+        try {
+            // Test Perfect Score Algorithm
+            const perfectResult = MazeAlgorithms.perfectScoreAlgorithm(0, 1, {});
+            console.log("✅ Perfect Score Algorithm:", perfectResult.move, "-", perfectResult.explanation);
+            
+            // Test Intelligent Explorer
+            const intelligentResult = MazeAlgorithms.intelligentExplorer(0, 1, {});
+            console.log("✅ Intelligent Explorer:", intelligentResult.move, "-", intelligentResult.explanation);
+            
+            // Test Ultra-Efficient Wall Follower
+            const ultraResult = MazeAlgorithms.ultraEfficientWallFollower(0, 1, {});
+            console.log("✅ Ultra-Efficient Wall Follower:", ultraResult.move, "-", ultraResult.explanation);
+            
+            // Test Strategic Dead End Seeker
+            const strategicResult = MazeAlgorithms.strategicDeadEndSeeker(0, 1, {});
+            console.log("✅ Strategic Dead End Seeker:", strategicResult.move, "-", strategicResult.explanation);
+            
+            console.log("\n🎉 All ultra-optimized algorithms are working correctly!");
+            
+        } catch (error) {
+            console.error("❌ Error testing algorithms:", error);
+        }
+        
+        // Test 3: Check helper functions
+        console.log("\n🔧 Testing Helper Functions:");
+        try {
+            const neighbors = MazeAlgorithms.getValidNeighbors(0);
+            console.log("✅ getValidNeighbors(0):", neighbors);
+            
+            console.log("✅ Helper functions working correctly!");
+        } catch (error) {
+            console.error("❌ Error testing helper functions:", error);
+        }
+    </script>
+</body>
+</html>

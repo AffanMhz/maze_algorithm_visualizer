@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Maze Algorithm Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react-icons@4.11.0/lib/index.js"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+        }
+        
+        /* Maze Grid Styling */
+        #maze-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(9, 1fr);
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+            position: relative;
+            border: 4px solid #374151;
+        }
+        
+        .maze-cell {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border: 1px solid #e5e7eb;
+            box-sizing: border-box;
+        }
+        
+        /* Wall styles */
+        .wall-n { border-top: 4px solid #111827; }
+        .wall-e { border-right: 4px solid #111827; }
+        .wall-s { border-bottom: 4px solid #111827; }
+        .wall-w { border-left: 4px solid #111827; }
+
+        /* Bot styling */
+        #bot {
+            position: absolute;
+            width: 11.11%;
+            height: 11.11%;
+            z-index: 10;
+            transition: all 0.15s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #bot-icon {
+            width: 70%;
+            height: 70%;
+            background-color: #6b7280;
+            border: 2px solid #374151;
+            border-radius: 50% 50% 40% 40%;
+            position: relative;
+            transition: transform 0.15s linear;
+        }
+        
+        #bot-icon::before {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 30%;
+            height: 30%;
+            background: #9ca3af;
+            border: 2px solid #374151;
+            border-radius: 50%;
+            z-index: -1;
+        }
+        
+        #bot-icon::after {
+            content: '';
+            position: absolute;
+            top: 10%; 
+            right: 10%;
+            width: 30%; 
+            height: 30%;
+            background: #9ca3af;
+            border: 2px solid #374151;
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        /* Coordinate display */
+        .coordinate-text {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.6rem;
+            color: #6b7280;
+            font-family: monospace;
+            z-index: 1;
+        }
+        
+        #maze-grid.show-coordinates .coordinate-text {
+            display: block;
+        }
+        
+        #maze-grid.show-coordinates .bg-green-300 .coordinate-text,
+        #maze-grid.show-coordinates .bg-blue-300 .coordinate-text {
+            display: none;
+        }
+
+        /* Path visualization */
+        .path-cell { background-color: #dbeafe !important; }
+        .dead-end-cell { background-color: #fecaca !important; }
+        .current-cell { background-color: #fde68a !important; }
+        
+        /* Algorithm comparison table */
+        .algo-table {
+            font-size: 0.875rem;
+        }
+        .algo-table th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+        }
+        .algo-table td {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            text-align: center;
+        }
+        
+        /* Score indicators */
+        .score-excellent { color: #059669; font-weight: bold; }
+        .score-good { color: #d97706; font-weight: bold; }
+        .score-poor { color: #dc2626; font-weight: bold; }
+        
+        /* Algorithm dropdown styling */
+        optgroup {
+            font-weight: bold;
+            color: #374151;
+        }
+        
+        optgroup option {
+            font-weight: normal;
+            color: #6b7280;
+            padding-left: 8px;
+        }
+        
+        /* Custom algorithm highlighting */
+        .custom-algorithm {
+            background-color: #f3e8ff !important;
+            border-left: 4px solid #8b5cf6 !important;
+        }
+        
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-6 flex items-center justify-center gap-3">
+        <svg class="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 11-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 11-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 112 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 110 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 110-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z" clip-rule="evenodd"></path>
+        </svg>
+        Comprehensive Maze Algorithm Analyzer
+    </h1>
+    
+    <div class="max-w-7xl mx-auto">
+        <!-- Control Panel -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Algorithm Control Panel</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Algorithm</label>
+                    <select id="algo-select" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <optgroup label="Basic Algorithms">
+                            <option value="left-hand">Left-Hand Rule</option>
+                            <option value="right-hand">Right-Hand Rule</option>
+                            <option value="random-mouse">Random Mouse</option>
+                        </optgroup>
+                        <optgroup label="Advanced Algorithms">
+                            <option value="pledge">Pledge Algorithm</option>
+                            <option value="tremaux">Trémaux Algorithm</option>
+                            <option value="dead-end-filling">Dead-End Filling</option>
+                            <option value="recursive-backtrack">Recursive Backtrack</option>
+                            <option value="flood-fill">Flood Fill</option>
+                        </optgroup>
+                        <optgroup label="🏆 COMPETITION WINNERS (Each Unique Strategy)">
+                            <option value="competition-winner-left">⚡ Ultra-Fast Left-Hand Explorer</option>
+                            <option value="competition-winner-backtrack">🎯 Maximum Coverage Backtracker</option>
+                            <option value="competition-winner-tremaux">🚀 Minimum Steps Trémaux</option>
+                            <option value="competition-winner-hunter">🔄 Adaptive Speed Hunter</option>
+                        </optgroup>
+                        <optgroup label="⚠️ Previous Experiments (Use Winners Above)">
+                            <option value="perfect-score">Perfect Score Algorithm (DEPRECATED)</option>
+                            <option value="intelligent-explorer">Intelligent Explorer (DEPRECATED)</option>
+                            <option value="ultra-efficient-wall-follower">Ultra-Efficient Wall Follower (DEPRECATED)</option>
+                            <option value="strategic-dead-end-seeker">Strategic Dead-End Seeker (DEPRECATED)</option>
+                        </optgroup>
+                        <optgroup label="Original Custom Algorithms">
+                            <option value="optimized-dead-end-hunter">Optimized Dead-End Hunter</option>
+                            <option value="smart-wall-follower">Smart Wall Follower</option>
+                            <option value="hybrid-explorer">Hybrid Explorer</option>
+                            <option value="minimum-steps-explorer">Minimum Steps Explorer</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Speed (ms)</label>
+                    <input id="speed-slider" type="range" min="50" max="1000" value="300" class="w-full">
+                    <div class="text-center text-sm text-gray-600 mt-1" id="speed-display">300ms</div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Maze</label>
+                    <select id="maze-select" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="given">Given Maze (14×14)</option>
+                        <option value="surprise">Surprise Maze (8×8)</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-end">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="coord-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all relative"></div>
+                        <span class="ml-2 text-sm text-gray-700">Show Coordinates</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button id="start-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">Start</button>
+                <button id="pause-btn" class="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600" disabled>Pause</button>
+                <button id="reset-btn" class="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Reset</button>
+                <button id="compare-all-btn" class="px-6 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                    Compare All Algorithms
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Maze Visualization -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Maze Visualization</h3>
+                    <div class="flex justify-center">
+                        <div id="maze-container" class="relative">
+                            <div id="maze-grid">
+                                <div id="bot">
+                                    <div id="bot-icon"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats and Logic Panel -->
+            <div>
+                <!-- Real-time Statistics -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Real-time Statistics</h3>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-blue-800">Steps</div>
+                            <div id="step-count" class="text-2xl font-bold text-blue-900">0</div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-green-800">Dead Ends</div>
+                            <div id="dead-end-count" class="text-2xl font-bold text-green-900">0/9</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-4 rounded-lg mb-4">
+                        <div class="text-sm font-medium text-purple-800">Current Score</div>
+                        <div id="current-score" class="text-2xl font-bold text-purple-900">0.00/20</div>
+                    </div>
+                    
+                    <div class="text-sm text-gray-600">
+                        <p><strong>Formula:</strong> 20 × (Explored/Total) × min(Optimal/Steps, 1)</p>
+                    </div>
+                </div>
+
+                <!-- Algorithm Logic Visualization -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Algorithm Logic</h3>
+                    
+                    <!-- Standard Wall Following Logic -->
+                    <div id="wall-follow-logic" class="space-y-2">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <div class="font-semibold text-gray-700">Sensor Readings:</div>
+                            <div id="sensor-display" class="font-mono text-sm mt-1">
+                                Left: <span id="left-sensor">-</span> | 
+                                Front: <span id="front-sensor">-</span> | 
+                                Right: <span id="right-sensor">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 bg-blue-50 rounded-lg">
+                            <div class="font-semibold text-blue-700">Decision Process:</div>
+                            <div id="decision-steps" class="text-sm mt-1 space-y-1">
+                                <!-- Dynamic decision steps will be added here -->
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 bg-green-50 rounded-lg">
+                            <div class="font-semibold text-green-700">Action:</div>
+                            <div id="current-action" class="font-mono text-lg font-bold text-green-800">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Algorithm Logic -->
+                    <div id="advanced-logic" class="hidden space-y-2">
+                        <div class="p-3 bg-yellow-50 rounded-lg">
+                            <div class="font-semibold text-yellow-700">Algorithm State:</div>
+                            <div id="algorithm-state" class="text-sm mt-1">-</div>
+                        </div>
+                        
+                        <div class="p-3 bg-indigo-50 rounded-lg">
+                            <div class="font-semibold text-indigo-700">Memory/Map:</div>
+                            <div id="algorithm-memory" class="text-sm mt-1 font-mono">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Algorithm Comparison Results -->
+        <div id="comparison-results" class="hidden mt-6 bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                Algorithm Comparison Results
+            </h3>
+            
+            <div class="overflow-x-auto">
+                <table id="results-table" class="w-full algo-table border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="text-left">Algorithm</th>
+                            <th>Steps</th>
+                            <th>Dead Ends Found</th>
+                            <th>Completion Rate</th>
+                            <th>Score (Given Maze)</th>
+                            <th>Score (Surprise Maze)</th>
+                            <th>Overall Ranking</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-tbody">
+                        <!-- Results will be populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                <h4 class="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                    Recommendations for Full Marks:
+                </h4>
+                <div id="recommendations" class="text-sm text-blue-700">
+                    <!-- Recommendations will be populated based on results -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Algorithm Documentation -->
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Algorithm Documentation
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <div class="space-y-4">
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            Wall Following Algorithms
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            <strong>Left/Right-Hand Rule:</strong> Keep one hand on the wall and follow it. 
+                            Simple but effective for most mazes. Works well when maze is simply connected.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Memory-free</span>
+                            <span class="text-blue-600">• Fast</span>
+                            <span class="text-purple-600">• Hardware-friendly</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm3 2h2v5L7 7 5 9V4z" clip-rule="evenodd"></path>
+                            </svg>
+                            Random Mouse Algorithm
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Randomly choose from available directions. Eventually explores everything 
+                            but can be very inefficient.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Memory-free</span>
+                            <span class="text-red-600">• Unpredictable</span>
+                            <span class="text-yellow-600">• Variable performance</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                            </svg>
+                            Pledge Algorithm
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Combination of walking straight and wall-following. Uses angle tracking 
+                            to ensure you don't go in circles.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Better than pure wall-following</span>
+                            <span class="text-blue-600">• Requires angle tracking</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            Trémaux Algorithm
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Mark paths as you traverse them. Backtrack when reaching dead ends 
+                            or fully explored junctions.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Guaranteed solution</span>
+                            <span class="text-blue-600">• Requires memory</span>
+                            <span class="text-purple-600">• Systematic</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                            Dead-End Filling
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Iteratively remove dead ends from the maze until only the solution path 
+                            remains. Requires full maze knowledge.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Optimal solution</span>
+                            <span class="text-blue-600">• Full map needed</span>
+                            <span class="text-purple-600">• Analysis technique</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-teal-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            Recursive Backtracking
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Systematically explore all paths using depth-first search with backtracking 
+                            when dead ends are reached.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Complete exploration</span>
+                            <span class="text-blue-600">• Stack-based</span>
+                            <span class="text-red-600">• Memory intensive</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h4 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-cyan-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            Flood Fill
+                        </h4>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Assign distance values to each cell from the goal, then follow the 
+                            gradient. Optimal but requires full maze knowledge.
+                        </p>
+                        <div class="text-xs text-gray-500 mt-2 space-x-4">
+                            <span class="text-green-600">• Optimal path</span>
+                            <span class="text-blue-600">• Full map needed</span>
+                            <span class="text-purple-600">• Fast execution</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border-2 border-yellow-200 rounded-lg bg-yellow-50">
+                        <h4 class="font-bold text-lg text-yellow-800 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            Custom Optimized Algorithms
+                        </h4>
+                        <p class="text-sm text-yellow-700 mt-2">
+                            <strong>New!</strong> Four custom algorithms designed for maximum performance:
+                        </p>
+                        <ul class="text-xs text-yellow-600 mt-2 space-y-1">
+                            <li>• <strong>Optimized Dead-End Hunter:</strong> Targets dead ends efficiently</li>
+                            <li>• <strong>Smart Wall Follower:</strong> Enhanced wall following with optimization</li>
+                            <li>• <strong>Hybrid Explorer:</strong> Multi-phase exploration strategy</li>
+                            <li>• <strong>Minimum Steps Explorer:</strong> Optimized for step count</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="p-4 border-2 border-green-200 rounded-lg bg-green-50">
+                        <h4 class="font-bold text-lg text-green-800 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            For Your Verilog Project
+                        </h4>
+                        <p class="text-sm text-green-700 mt-2">
+                            <strong>Recommended:</strong> Start with Left-Hand or Right-Hand Rule. They are memory-free, 
+                            hardware-friendly, and guarantee exploration of all accessible areas.
+                        </p>
+                        <div class="text-xs text-green-600 mt-2">
+                            <strong>Pro Tip:</strong> Use the custom algorithms to understand optimal strategies, then implement the logic in Verilog!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Implementation -->
+    <script src="maze-data.js"></script>
+    <script src="algorithms.js"></script>
+    <script src="visualization.js"></script>
+    <script src="main.js"></script>
+
+</body>
+</html>
