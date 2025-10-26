@@ -2,6 +2,8 @@
 
 A competition-grade web-based tool for analyzing and comparing maze exploration algorithms, specifically designed for the **eYRC 2025-26 Maze Solver Bot** challenge with revolutionary ultra-optimized algorithms.
 
+### 🚀 [**Click Here to Try the Live Demo**](https://affanmhz.github.io/maze_algorithm_visualizer/)
+
 ## 🏆 BREAKTHROUGH: Competition-Winning Algorithms
 
 After extensive research and analysis, we've implemented **research-proven algorithms** that consistently outperform complex alternatives:
