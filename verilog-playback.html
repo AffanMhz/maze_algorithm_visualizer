@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verilog Log Playback - Maze Algorithm Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+        }
+        
+        /* Maze Grid Styling */
+        #maze-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(9, 1fr);
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+            position: relative;
+            border: 4px solid #374151;
+        }
+        
+        .maze-cell {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border: 1px solid #e5e7eb;
+            box-sizing: border-box;
+        }
+        
+        /* Wall styles */
+        .wall-n { border-top: 4px solid #111827; }
+        .wall-e { border-right: 4px solid #111827; }
+        .wall-s { border-bottom: 4px solid #111827; }
+        .wall-w { border-left: 4px solid #111827; }
+
+        /* Bot styling */
+        /* Bot container: handles positioning on the maze */
+        #bot {
+            position: absolute;
+            width: 11.11%;
+            height: 11.11%;
+            z-index: 10;
+            transition: left 0.15s linear, top 0.15s linear, transform 0.15s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        /* Bot body: rectangular robot car shape */
+        #bot-icon {
+            width: 60%;
+            height: 70%;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: 3px solid #1e40af;
+            border-radius: 15%;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Front sensor/headlight indicator */
+        #bot-icon::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30%;
+            height: 8px;
+            background: #fbbf24;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #fbbf24;
+        }
+
+        /* Antenna */
+        #bot-icon::after {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 8px;
+            background: #9ca3af;
+        }
+
+        /* Left wheel */
+        .wheel-left {
+            position: absolute;
+            width: 18%;
+            height: 35%;
+            background: #1f2937;
+            border: 2px solid #111827;
+            border-radius: 3px;
+            top: 50%;
+            left: -5%;
+            transform: translateY(-50%);
+        }
+
+        /* Right wheel */
+        .wheel-right {
+            position: absolute;
+            width: 18%;
+            height: 35%;
+            background: #1f2937;
+            border: 2px solid #111827;
+            border-radius: 3px;
+            top: 50%;
+            right: -5%;
+            transform: translateY(-50%);
+        }
+        
+        /* Windshield/Window */
+        #bot-icon .windshield {
+            position: absolute;
+            width: 50%;
+            height: 30%;
+            background: rgba(191, 219, 254, 0.6);
+            border: 1px solid #60a5fa;
+            border-radius: 8px;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        /* Visited cells */
+        .visited {
+            background-color: #dbeafe !important;
+        }
+        
+        .dead-end-visited {
+            background-color: #fecaca !important;
+        }
+        
+        /* Coordinate display */
+        .coordinate-text {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.6rem;
+            color: #6b7280;
+            font-family: monospace;
+            z-index: 1;
+        }
+        
+        #maze-grid.show-coordinates .coordinate-text {
+            display: block;
+        }
+        
+        #maze-grid.show-coordinates .bg-green-300 .coordinate-text,
+        #maze-grid.show-coordinates .bg-blue-300 .coordinate-text {
+            display: none;
+        }
+
+        /* Path visualization */
+        .path-cell { background-color: #dbeafe !important; }
+        .dead-end-cell { background-color: #fecaca !important; }
+        .current-cell { background-color: #fde68a !important; }
+        
+        /* Visited cells */
+        .visited {
+            background-color: #dbeafe !important;
+        }
+        
+        .dead-end-visited {
+            background-color: #fecaca !important;
+        }
+        
+        /* Animation for step update */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .step-pulse {
+            animation: pulse 0.3s ease-in-out;
+        }
+        
+        /* Log textarea styling */
+        #log-input {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Header -->
+    <div class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"></path>
+                    </svg>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Verilog Log Playback</h1>
+                        <p class="text-sm text-gray-600">Visualize your testbench output</p>
+                    </div>
+                </div>
+                <a href="index.html" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Back to Simulator
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Instructions Banner -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
+            <div class="flex items-start">
+                <svg class="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                </svg>
+                <div>
+                    <h3 class="text-lg font-semibold text-blue-900 mb-1">How to Use</h3>
+                    <ol class="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                        <li>Paste your Verilog testbench log output in the text area below</li>
+                        <li>Click "Validate Log" to check the format is correct</li>
+                        <li>Click "Load & Play" to start the visualization</li>
+                        <li>Watch your bot navigate the maze based on your Verilog implementation!</li>
+                    </ol>
+                    <p class="text-xs text-blue-700 mt-2">
+                        <strong>Expected format:</strong> <code class="bg-blue-100 px-1 rounded">Step 0: Pos=[4, 8] Facing=N Walls=101 Move=001</code>
+                        <br><strong>Note:</strong> Lines with <code class="bg-blue-100 px-1 rounded">#</code> comments are automatically supported!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Panel: Maze Visualization (Takes 2 columns) -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Maze Visualization</h2>
+                    
+                    <div class="flex justify-center">
+                        <div id="maze-container" class="relative">
+                            <div id="maze-grid">
+                                <div id="bot">
+                                    <div id="bot-icon">
+                                        <div class="wheel-left"></div>
+                                        <div class="wheel-right"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mt-6">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Progress</span>
+                            <span id="progress-text">0 / 0 steps</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Log Input Below Maze -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Verilog Log Input</h2>
+                    
+                    <textarea 
+                        id="log-input" 
+                        rows="12"
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                        placeholder="Paste your Verilog testbench log here...
+
+Example format:
+Step 0: Pos=[4, 8] Facing=N Walls=101 Move=001
+Step 1: Pos=[4, 7] Facing=N Walls=010 Move=001
+Step 2: Pos=[4, 6] Facing=N Walls=010 Move=001
+..."
+                    ></textarea>
+                    
+                    <div class="mt-4 space-y-2">
+                        <button id="validate-btn" class="w-full px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Validate Log Format
+                        </button>
+                        
+                        <button id="load-demo-btn" class="w-full px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Load Demo Log
+                        </button>
+                    </div>
+                    
+                    <div id="validation-result" class="mt-4 hidden"></div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Controls & Statistics (Takes 1 column) -->
+            <div class="lg:col-span-1">
+                <!-- Playback Controls -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Playback Controls</h2>
+                    
+                    <div class="space-y-4">
+                        <button id="start-btn" class="w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                            </svg>
+                            Load & Play
+                        </button>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="pause-btn" class="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors" disabled>
+                                ⏸️ Pause
+                            </button>
+                            <button id="stop-btn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
+                                ⏹️ Stop
+                            </button>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Playback Speed: <span id="speed-value" class="font-bold text-blue-600">300</span>ms
+                            </label>
+                            <input type="range" id="speed-slider" min="50" max="1000" value="300" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>Fast (50ms)</span>
+                                <span>Slow (1000ms)</span>
+                            </div>
+                        </div>
+                        
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="coord-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all relative"></div>
+                            <span class="ml-3 text-sm font-medium text-gray-700">Show Coordinates</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Current Step Info -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Current Step Info</h2>
+                    
+                    <div id="step-info" class="space-y-3">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <div class="text-xs text-gray-600 uppercase">Step Number</div>
+                            <div id="info-step" class="text-2xl font-bold text-gray-900">-</div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="p-3 bg-blue-50 rounded-lg">
+                                <div class="text-xs text-blue-600 uppercase">Position</div>
+                                <div id="info-pos" class="text-lg font-bold text-blue-900">-</div>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg">
+                                <div class="text-xs text-green-600 uppercase">Facing</div>
+                                <div id="info-facing" class="text-lg font-bold text-green-900">-</div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 bg-purple-50 rounded-lg">
+                            <div class="text-xs text-purple-600 uppercase">Walls (L-M-R)</div>
+                            <div id="info-walls" class="text-lg font-mono font-bold text-purple-900">- - -</div>
+                        </div>
+                        
+                        <div class="p-3 bg-orange-50 rounded-lg">
+                            <div class="text-xs text-orange-600 uppercase">Move Command</div>
+                            <div id="info-move" class="text-lg font-bold text-orange-900">-</div>
+                        </div>
+                        
+                        <div id="info-deadend" class="hidden p-3 bg-red-100 rounded-lg border-2 border-red-400">
+                            <div class="text-sm font-bold text-red-900">🚧 Dead End Detected!</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Statistics</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Total Steps</span>
+                                <span id="stat-total" class="font-bold text-gray-900">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Current Step</span>
+                                <span id="stat-current" class="font-bold text-blue-600">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Positions Visited</span>
+                                <span id="stat-positions" class="font-bold text-green-600">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Dead Ends Found</span>
+                                <span id="stat-deadends" class="font-bold text-red-600">0 / 9</span>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <div class="text-sm text-gray-600 mb-2">Move Breakdown</div>
+                            <div id="move-breakdown" class="space-y-1 text-xs">
+                                <div class="flex justify-between">
+                                    <span>FORWARD:</span>
+                                    <span id="move-forward" class="font-mono">0</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>LEFT:</span>
+                                    <span id="move-left" class="font-mono">0</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>RIGHT:</span>
+                                    <span id="move-right" class="font-mono">0</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>UTURN:</span>
+                                    <span id="move-uturn" class="font-mono">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-sm font-medium text-gray-700">Status</span>
+                                <span id="stat-status" class="px-3 py-1 bg-gray-300 text-gray-700 rounded-full text-xs font-bold">Not Loaded</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="maze-data.js"></script>
+    <script src="visualization.js"></script>
+    <script>
+        // --- Constants from maze-data.js are already loaded ---
+        const DEAD_END_POSITIONS = new Set([11, 20, 26, 34, 45, 48, 56, 64, 80]);
+        const START_POS = 76; 
+        const EXIT_POS = 4;   
+        const MAX_STEPS = 250;
+        
+        // --- Bot State ---
+        let botPos = START_POS;
+        let botFacing = 0; // 0:N, 1:E, 2:S, 3:W
+        let stepCount = 0;
+        let visitedCells = new Set();
+        let deadEndsVisited = new Set();
+        let simulationSpeed = 300; // ms
+
+        // --- Playback State ---
+        let playbackSteps = [];
+        let playbackIndex = 0;
+        let playbackInterval = null;
+        
+        // --- DOM Elements ---
+        const visualizer = new MazeVisualizer();
+        const logInput = document.getElementById('log-input');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        const validateBtn = document.getElementById('validate-btn');
+        const loadDemoBtn = document.getElementById('load-demo-btn');
+        const validationResult = document.getElementById('validation-result');
+        const coordToggle = document.getElementById('coord-toggle');
+        const mazeGrid = document.getElementById('maze-grid');
+        
+        // Initialize maze
+        visualizer.drawMaze('given');
+        
+        // --- Core Functions ---
+        
+        function parseLog(logText) {
+            const steps = [];
+            const lines = logText.split('\n');
+            // Support optional # comment prefix
+            const regex = /^\s*#?\s*Step\s+(\d+):\s*Pos=\[(\d+),\s*(\d+)\]\s*Facing=(\w)\s*Walls=([\d]+)\s*Move=([\d]+)/i;
+            const facingMap = { 'N': 0, 'E': 1, 'S': 2, 'W': 3 };
+
+            for (const line of lines) {
+                const match = line.trim().match(regex);
+                if (match) {
+                    const [_, stepNum, x, y, facingChar, walls, move] = match;
+                    const posX = parseInt(x, 10);
+                    const posY = parseInt(y, 10);
+                    const pos = posY * 9 + posX; 
+                    const facing = facingMap[facingChar.toUpperCase()];
+                    
+                    if (pos >= 0 && pos < 81 && facing !== undefined) {
+                        steps.push({
+                            step: parseInt(stepNum, 10),
+                            pos: pos,
+                            x: posX,
+                            y: posY,
+                            facing: facing,
+                            facingChar: facingChar.toUpperCase(),
+                            walls: walls, 
+                            move: move    
+                        });
+                    } else {
+                        console.warn("Skipping invalid log line:", line);
+                    }
+                }
+            }
+            return steps;
+        }
+
+        function playbackStep() {
+            if (playbackIndex >= playbackSteps.length) {
+                pausePlayback();
+                if (botPos === EXIT_POS && botFacing === 0) {
+                    alert(`🎉 Log Playback Finished. Maze Exited Successfully in ${stepCount} steps!`);
+                } else {
+                    alert(`⚠️ Log Playback Finished. Bot ended at step ${stepCount}.`);
+                }
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                document.getElementById('stat-status').textContent = 'Completed';
+                document.getElementById('stat-status').className = 'px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold';
+                return;
+            }
+
+            const stepData = playbackSteps[playbackIndex];
+            
+            botPos = stepData.pos;
+            botFacing = stepData.facing;
+            stepCount = stepData.step; 
+            
+            // Update visualization
+            visualizer.updateBotPosition(botPos, botFacing);
+            
+            // Mark cell as visited
+            const cell = document.getElementById(`cell-${botPos}`);
+            if (cell && !cell.classList.contains('bg-green-300') && !cell.classList.contains('bg-blue-300')) {
+                cell.classList.add('visited');
+            }
+            
+            // Check for dead end (UTURN = '100')
+            if (stepData.move === '100') {
+                if (DEAD_END_POSITIONS.has(botPos) && !deadEndsVisited.has(botPos)) {
+                    deadEndsVisited.add(botPos);
+                    if (cell) {
+                        cell.classList.remove('visited');
+                        cell.classList.add('dead-end-visited');
+                    }
+                }
+            }
+            
+            // Update info panel
+            document.getElementById('info-step').textContent = stepData.step;
+            document.getElementById('info-pos').textContent = `(${stepData.x}, ${stepData.y})`;
+            document.getElementById('info-facing').textContent = stepData.facingChar;
+            document.getElementById('info-walls').textContent = `${stepData.walls[0]}-${stepData.walls[1]}-${stepData.walls[2]}`;
+            
+            // Map move binary to text
+            const moveMap = {
+                '000': 'STOP',
+                '001': 'FORWARD',
+                '010': 'LEFT',
+                '011': 'RIGHT',
+                '100': 'UTURN'
+            };
+            document.getElementById('info-move').textContent = moveMap[stepData.move] || stepData.move;
+            
+            const deadendIndicator = document.getElementById('info-deadend');
+            if (stepData.move === '100' && DEAD_END_POSITIONS.has(botPos)) {
+                deadendIndicator.classList.remove('hidden');
+            } else {
+                deadendIndicator.classList.add('hidden');
+            }
+            
+            updateStats();
+            
+            playbackIndex++;
+        }
+
+        function startPlayback() {
+            const text = logInput.value;
+            if (!text.trim()) {
+                alert('Please paste a Verilog log first or click "Load Demo Log"');
+                return;
+            }
+            
+            // Reset if first time
+            if (playbackSteps.length === 0) {
+                resetVisualization();
+                playbackSteps = parseLog(text);
+                
+                if (playbackSteps.length === 0) {
+                    alert('Could not find any valid "Step..." lines in the log.');
+                    return;
+                }
+                playbackIndex = 0;
+            }
+            
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            document.getElementById('stat-status').textContent = 'Playing';
+            document.getElementById('stat-status').className = 'px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold';
+            
+            playbackInterval = setInterval(playbackStep, simulationSpeed);
+        }
+
+        function pausePlayback() {
+            clearInterval(playbackInterval);
+            playbackInterval = null;
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            document.getElementById('stat-status').textContent = 'Paused';
+            document.getElementById('stat-status').className = 'px-3 py-1 bg-yellow-500 text-white rounded-full text-xs font-bold';
+        }
+        
+        function stopPlayback() {
+            pausePlayback();
+            resetVisualization();
+            playbackSteps = [];
+            playbackIndex = 0;
+            document.getElementById('stat-status').textContent = 'Stopped';
+            document.getElementById('stat-status').className = 'px-3 py-1 bg-gray-300 text-gray-700 rounded-full text-xs font-bold';
+        }
+        
+        // --- Event handlers ---
+        startBtn.addEventListener('click', startPlayback);
+        
+        pauseBtn.addEventListener('click', pausePlayback);
+        
+        stopBtn.addEventListener('click', stopPlayback);
+        
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseInt(e.target.value);
+            speedValue.textContent = speed;
+            simulationSpeed = speed;
+        });
+        
+        coordToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                mazeGrid.classList.add('show-coordinates');
+            } else {
+                mazeGrid.classList.remove('show-coordinates');
+            }
+        });
+        
+        validateBtn.addEventListener('click', () => {
+            const text = logInput.value;
+            if (!text.trim()) {
+                alert('Please paste a log first');
+                return;
+            }
+            
+            const steps = parseLog(text);
+            
+            if (steps.length > 0) {
+                validationResult.className = 'mt-4 p-4 bg-green-100 border-l-4 border-green-500 rounded-lg';
+                validationResult.innerHTML = `
+                    <p class="font-bold text-green-900 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        Valid Log Format
+                    </p>
+                    <p class="text-green-800 text-sm mt-1">Found ${steps.length} valid steps!</p>
+                `;
+            } else {
+                validationResult.className = 'mt-4 p-4 bg-red-100 border-l-4 border-red-500 rounded-lg';
+                validationResult.innerHTML = `
+                    <p class="font-bold text-red-900">❌ Invalid Log Format</p>
+                    <p class="text-red-800 text-sm mt-1">Could not find any valid "Step..." lines in the log.</p>
+                `;
+            }
+            
+            validationResult.classList.remove('hidden');
+        });
+        
+        loadDemoBtn.addEventListener('click', () => {
+            // Only load demo if textarea is empty or user confirms
+            if (logInput.value.trim() && !confirm('This will replace your current log. Continue?')) {
+                return;
+            }
+            
+            const demoLog = `Step 0: Pos=[4, 8] Facing=N Walls=101 Move=001
+Step 1: Pos=[4, 7] Facing=N Walls=010 Move=001
+Step 2: Pos=[4, 6] Facing=N Walls=010 Move=001
+Step 3: Pos=[4, 5] Facing=N Walls=111 Move=100
+Step 4: Pos=[4, 5] Facing=S Walls=110 Move=010
+Step 5: Pos=[3, 5] Facing=S Walls=010 Move=001
+Step 6: Pos=[3, 6] Facing=S Walls=001 Move=001
+Step 7: Pos=[3, 7] Facing=S Walls=100 Move=011
+Step 8: Pos=[3, 7] Facing=W Walls=011 Move=001
+Step 9: Pos=[2, 7] Facing=W Walls=101 Move=010
+Step 10: Pos=[2, 7] Facing=N Walls=111 Move=100
+Step 11: Pos=[2, 7] Facing=S Walls=010 Move=001
+Step 12: Pos=[2, 8] Facing=S Walls=111 Move=100`;
+            
+            logInput.value = demoLog;
+            
+            validationResult.className = 'mt-4 p-4 bg-blue-100 border-l-4 border-blue-500 rounded-lg';
+            validationResult.innerHTML = `
+                <p class="font-bold text-blue-900">✅ Demo Log Loaded</p>
+                <p class="text-blue-800 text-sm mt-1">Click "Load & Play" to start visualization!</p>
+            `;
+            validationResult.classList.remove('hidden');
+        });
+        
+        function updateStats() {
+            document.getElementById('stat-total').textContent = playbackSteps.length;
+            document.getElementById('stat-current').textContent = stepCount;
+            document.getElementById('stat-positions').textContent = visitedCells.size;
+            document.getElementById('stat-deadends').textContent = `${deadEndsVisited.size} / 9`;
+            
+            // Update move breakdown (count from playback steps)
+            const moveBreakdown = { 'FORWARD': 0, 'LEFT': 0, 'RIGHT': 0, 'UTURN': 0 };
+            for (let i = 0; i < playbackIndex; i++) {
+                const move = playbackSteps[i].move;
+                if (move === '001') moveBreakdown['FORWARD']++;
+                else if (move === '010') moveBreakdown['LEFT']++;
+                else if (move === '011') moveBreakdown['RIGHT']++;
+                else if (move === '100') moveBreakdown['UTURN']++;
+            }
+            
+            document.getElementById('move-forward').textContent = moveBreakdown['FORWARD'];
+            document.getElementById('move-left').textContent = moveBreakdown['LEFT'];
+            document.getElementById('move-right').textContent = moveBreakdown['RIGHT'];
+            document.getElementById('move-uturn').textContent = moveBreakdown['UTURN'];
+            
+            // Update progress bar
+            const progress = playbackSteps.length > 0 ? (stepCount / playbackSteps.length) * 100 : 0;
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+            document.getElementById('progress-text').textContent = `${stepCount} / ${playbackSteps.length} steps`;
+        }
+        
+        function resetVisualization() {
+            botPos = START_POS;
+            botFacing = 0;
+            stepCount = 0;
+            visitedCells.clear();
+            deadEndsVisited.clear();
+            visualizer.drawMaze('given');
+            visualizer.updateBotPosition(START_POS, 0);
+            
+            // Reset info panel
+            document.getElementById('info-step').textContent = '-';
+            document.getElementById('info-pos').textContent = '-';
+            document.getElementById('info-facing').textContent = '-';
+            document.getElementById('info-walls').textContent = '- - -';
+            document.getElementById('info-move').textContent = '-';
+            document.getElementById('info-deadend').classList.add('hidden');
+            
+            updateStats();
+        }
+        
+        // Initial update
+        updateStats();
+    </script>
+</body>
+</html>
